@@ -45,7 +45,7 @@ def copy_file(source, dest1, dest2):
 
 
 def test_qualitychecks_report_for_file():
-    config = init('ab')
+    config = init('ba')
     data_path = os.path.join(os.getcwd(),"test/data1")
     new_data1 = os.path.join(data_path,"test_data1.h5")
     new_data2 = os.path.join(data_path,"test_data2.h5")
@@ -61,12 +61,7 @@ def test_qualitychecks_report_for_file():
     bad_data2 = bad_indexes_type[new_data2]
     assert 0 in bad_data1
     assert 0 in bad_data2
-    assert 1 in bad_data1
-    assert 1 in bad_data2
-    #assert 3 in bad_data1
-    #assert 3 in bad_data2
     assert 4 in bad_data1
-    assert 4 in bad_data2
     assert not res.is_text_in_file(logfile, 'no file extension specified. Monitoring for all files')
     clean(new_data1, new_data2)
 
@@ -85,19 +80,15 @@ def test_qualitychecks_one_report():
     bad_indexes = acc.verify(config, data_path, data_type, 2, False)
     bad_data = bad_indexes[data_type]
     assert 0 in bad_data
-    assert 5 in bad_data
-    assert 1 in bad_data
-    assert 6 in bad_data
-    #assert 3 in bad_data
-    #assert 8 in bad_data
     assert 4 in bad_data
+    assert 5 in bad_data
     assert 9 in bad_data
     assert not res.is_text_in_file(logfile, 'no file extension specified. Monitoring for all files')
     clean(new_data1, new_data2)
 
 
 def test_no_extentions_interrupt():
-    config = init('cd')
+    config = init('bd')
     data_path = os.path.join(os.getcwd(),"test/data1")
     new_data1 = os.path.join(data_path,"INTERRUPT")
     new_data2 = os.path.join(data_path,"INTERRUPT.h5")
@@ -112,14 +103,13 @@ def test_no_extentions_interrupt():
     p.start()
 
     bad_indexes = acc.verify(config, data_path, data_type, 2, True)
-    bad_indexes_type = bad_indexes[data_type]
-    assert len(bad_indexes_type) is 0
+    assert len(bad_indexes) is 0
     assert res.is_text_in_file(logfile, 'no file extension specified. Monitoring for all files')
     clean()
 
 
 def test_bad_directory():
-    config = init('de')
+    config = init('be')
     directory = "bad_dir"
     # the file.verify will exit with -1
     try:
@@ -131,7 +121,7 @@ def test_bad_directory():
     clean()
 
 def test_conf_error_no_limits():
-    config = init('cc')
+    config = init('bf')
     find = 'limits'
     replace = 'limitsx'
     mod.replace_text_in_file(config, find, replace)
@@ -146,7 +136,7 @@ def test_conf_error_no_limits():
 
 
 def test_no_limit():
-    config = init('ef')
+    config = init('bg')
     find = 'limits.json'
     replace = 'limitsx.json'
     mod.replace_text_in_file(config, find, replace)

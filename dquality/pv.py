@@ -92,6 +92,9 @@ def init(config):
 
     """
     conf = utils.get_config(config)
+    if conf is None:
+        print ('configuration file is missing')
+        exit(-1)
 
     logger = utils.get_logger(__name__, conf)
 
@@ -215,4 +218,6 @@ def verify(conf):
                                        str(pv_value) + ' but should be ' +
                                        attr + ' ' +
                                        str(pv_attr[attr]))
+    if res:
+        logger.info('All PVs listed in pvs.json exist and meet conditions')
     return res

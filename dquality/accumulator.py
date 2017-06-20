@@ -68,6 +68,7 @@ import numpy as np
 import dquality.common.utilities as utils
 import dquality.handler as datahandler
 import dquality.common.report as report
+import dquality.common.constants as const
 from dquality.common.containers import Data
 
 __author__ = "Barbara Frosik"
@@ -83,8 +84,10 @@ INTERRUPT = 'interrupt'
 
 def init(config):
     """
-    This function initializes global variables. It gets values from the configuration file, evaluates and processes
-    the values. If mandatory file or directory is missing, the script logs an error and exits.
+    This function initializes variables according to configuration.
+
+    It gets values from the configuration file, evaluates and processes the values. If mandatory file or directory
+    is missing, the script logs an error and exits.
 
     Parameters
     ----------
@@ -104,8 +107,18 @@ def init(config):
 
     extensions : list
         a list containing extensions of files to be monitored read from the configuration file
+
+    report_type : int
+        report type; currently supporting 'none', 'error', and 'full'
+
+    consumers : dict
+        a dictionary containing consumer processes to run, and their parameters
+
     """
     conf = utils.get_config(config)
+    if conf is None:
+        print ('configuration file is missing')
+        exit(-1)
 
     logger = utils.get_logger(__name__, conf)
 
@@ -115,8 +128,6 @@ def init(config):
 
     with open(limitsfile) as limits_file:
         limits = json.loads(limits_file.read())
-
-    report_file = utils.get_file(conf, 'report_file', logger)
 
     try:
         extensions = conf['extensions']
@@ -132,12 +143,25 @@ def init(config):
         dict = json.loads(qc_file.read())
     quality_checks = utils.get_quality_checks(dict)
 
-    return logger, limits, quality_checks, extensions
+    try:
+        report_type = conf['report_type']
+    except KeyError:
+        report_type = const.REPORT_FULL
+
+    consumersfile = utils.get_file(conf, 'consumers', logger, False)
+    if consumersfile is None:
+        consumers = None
+    else:
+        with open(consumersfile) as consumers_file:
+            consumers = json.loads(consumers_file.read())
+
+    return logger, limits, quality_checks, extensions, report_type, consumers
 
 
 def directory(directory, patterns):
     """
     This method monitors a directory given by the "*directory*" parameter.
+
     It creates a notifier object. The notifier is registered to await
     the "*CLOSE_WRITE*" event on a new file that matches the "*pattern*"
     parameter. If there is no such event, it yields control on timeout,
@@ -145,7 +169,7 @@ def directory(directory, patterns):
 
     Parameters
     ----------
-    file : str
+    directory : str
         File Name including path
 
     patterns : list
@@ -153,7 +177,8 @@ def directory(directory, patterns):
 
     Returns
     -------
-    None
+    notifier : Notifier
+        a Notifier instance
     """
     class EventHandler(pyinotify.ProcessEvent):
 
@@ -173,6 +198,8 @@ def directory(directory, patterns):
 
 def verify(conf, folder, data_type, num_files, report_by_files=True):
     """
+    This function discovers new files and evaluates data in the files.
+
     This is the main function called when the verifier application starts.
     It reads the configuration for the directory to monitor, for pattern
     that represents a file extension to look for, and for a number of
@@ -220,7 +247,7 @@ def verify(conf, folder, data_type, num_files, report_by_files=True):
         a dictionary or list containing bad indexes
 
     """
-    logger, limits, quality_checks, extensions = init(conf)
+    logger, limits, quality_checks, extensions, report_type, consumers = init(conf)
     if not os.path.isdir(folder):
         logger.error(
             'parameter error: directory ' +
@@ -234,7 +261,7 @@ def verify(conf, folder, data_type, num_files, report_by_files=True):
     offset_list = []
     dataq = Queue()
     aggregateq = Queue()
-    p = Process(target=datahandler.handle_data, args=(dataq, limits[data_type], aggregateq, quality_checks,))
+    p = Process(target=datahandler.handle_data, args=(dataq, limits, aggregateq, quality_checks, consumers))
     p.start()
 
     file_index = 0
@@ -253,7 +280,7 @@ def verify(conf, folder, data_type, num_files, report_by_files=True):
             if file.find('INTERRUPT') >= 0:
                 # the calling function may use a 'interrupt' command to stop the monitoring
                 # and processing.
-                dataq.put('all_data')
+                dataq.put(Data(const.DATA_STATUS_END))
                 notifier.stop()
                 interrupted = True
                 break
@@ -267,30 +294,29 @@ def verify(conf, folder, data_type, num_files, report_by_files=True):
                 file_list.append(file)
                 offset_list.append(slice_index)
                 for i in range(0, data.shape[0]):
-                    dataq.put(Data(data[i]))
+                    dataq.put(Data(const.DATA_STATUS_DATA, data[i], data_type))
                 file_index += 1
                 if file_index == num_files:
-                    dataq.put('all_data')
+                    dataq.put(Data(const.DATA_STATUS_END))
                     notifier.stop()
                     interrupted = True
                     break
 
     aggregate = aggregateq.get()
 
+    #report.report_results(logger, aggregate, data_type, None, report_file, report_type)
+
+    bad_indexes = {}
+    if report_by_files == 'True':
+        report.add_bad_indexes_per_file(aggregate, bad_indexes, file_list, offset_list)
+    else:
+        report.add_bad_indexes(aggregate, bad_indexes)
     try:
         report_file = open(report_file, 'w')
+        report.report_bad_indexes(bad_indexes, report_file)
     except:
-        logger.warning('Cannot open report file, writing report on console')
-        report_file = None
+        logger.warning('Cannot open report file')
 
-    report.report_results(aggregate, data_type, None, report_file)
-    bad_indexes = {}
-
-    if report_by_files == 'True':
-        report.add_bad_indexes_per_file(aggregate, data_type, bad_indexes, file_list, offset_list)
-    else:
-        report.add_bad_indexes(aggregate, data_type, bad_indexes)
-    report.report_bad_indexes(bad_indexes, report_file)
 
     return bad_indexes
 

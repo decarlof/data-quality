@@ -11,7 +11,9 @@ This section contains various DQuality examples. Please make sure the installati
    demo/doc.demo.hdf_check
    demo/doc.demo.hdf_dependency_check
    demo/doc.demo.monitor_check
+   demo/doc.demo.monitor_polling_check
    demo/doc.demo.pv_check
+   demo/doc.demo.realtime_check
 
 .. automodule:: dquality
    :members:

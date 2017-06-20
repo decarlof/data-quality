@@ -95,6 +95,9 @@ def init(config):
 
     """
     conf = utils.get_config(config)
+    if conf is None:
+        print ('configuration file is missing')
+        exit(-1)
 
     logger = utils.get_logger(__name__, conf)
 
@@ -288,5 +291,8 @@ def verify(conf, file):
         for tag_list in batch:
             if not verify_list(file, tag_list, relation, logger):
                 res = False
+
+    if res:
+        logger.info('All dependecies are satisfied')
 
     return res

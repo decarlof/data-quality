@@ -51,7 +51,7 @@ This file contains functions used to report results of quality checks and functi
 facilitating logger.
 
 """
-
+import dquality.common.constants as const
 import pprint
 
 __author__ = "Barbara Frosik"
@@ -63,15 +63,16 @@ __all__ = ['report_results',
            'report_bad_indexes']
 
 
-def report_results(aggregate, type, filename, report_file):
+def report_results(logger, aggregates, filename, report_file, report_type):
     """
     This function reports results of quality checks to a file or console
-    if the file is not defined.
+    if the file is not defined. If the report type is REPORT_FULL, it will report all results.
+    If the type is REPORT_ERRORS, only the results that did not pass quality checks will be reported.
 
     Parameters
     ----------
-    aggregate : Aggregate
-        an instance holding result values for the data of one type
+    aggregates : dict <data_type : Aggregate>
+        dictionary with instances holding result values keyed by data type
 
     type : str
         a string characterizung the data type (i.e. data_dark, data_white or data)
@@ -82,23 +83,36 @@ def report_results(aggregate, type, filename, report_file):
     report_file : file
         a file where the report will be written, or None, if written to a console
 
+    report_type : int
+        report type, currently supporting 'none, 'errors', and 'full'
+
     Returns
     -------
     None
     """
-
     if report_file is None:
-        if filename is not None:
-            print (filename + '\n')
-        print (type + '\n')
-        pprint.pprint(aggregate, depth=3)
-    else:
-        if filename is not None:
-            report_file.write(filename+ '\n')
-        report_file.write(type+ '\n')
-        pprint.pprint(aggregate, report_file)
+        return
 
-def add_bad_indexes(aggregate, type, bad_indexes):
+    try:
+        report = open(report_file, 'w')
+        for type in aggregates:
+            if report_type == const.REPORT_FULL:
+                reported = aggregates[type]
+            elif report_type == const.REPORT_ERRORS:
+                reported = aggregates[type]['bad_indexes']
+            else:
+                return
+
+            if filename is not None:
+                report.write(filename+ '\n')
+            report.write('evaluated ' + type + ', bad indexes:\n')
+            pprint.pprint(reported, report)
+    except:
+        logger.warning('Cannot open report file')
+        pass
+
+
+def add_bad_indexes(aggregates, bad_indexes):
     """
     This function gets bad indexes from aggregate instance and creates an entry in
     bad_indexes dictionary. The bad_indexes dictionary will have added an entry for the given type.
@@ -106,24 +120,25 @@ def add_bad_indexes(aggregate, type, bad_indexes):
 
     Parameters
     ----------
-    aggregate : Aggregate
-        an instance holding result values for the data of one type
-    type : str
-        a string characterizung the data type (i.e. data_dark, data_white or data)
+    aggregates : dict <data_type : Aggregate>
+        dictionary with instances holding result values keyed by data type
+
     bad_indexes : dictionary
         a dictionary structure that the bad indexes will be written to
+
     Returns
     -------
     None
     """
 
-    list = []
-    for key in aggregate['bad_indexes'].keys():
-        list.append(key)
-    bad_indexes[type] = list
+    for type in aggregates:
+        list = []
+        for key in aggregates[type]['bad_indexes'].keys():
+            list.append(key)
+        bad_indexes[type] = list
 
 
-def add_bad_indexes_per_file(aggregate, type, bad_indexes, file_list, offset_list):
+def add_bad_indexes_per_file(aggregates, bad_indexes, file_list, offset_list):
     """
     This function gets bad indexes from aggregate instance and creates an entry in
     bad_indexes dictionary. The bad_indexes dictionary will have added an entry for the given type.
@@ -132,11 +147,8 @@ def add_bad_indexes_per_file(aggregate, type, bad_indexes, file_list, offset_lis
 
     Parameters
     ----------
-    aggregate : Aggregate
-        an instance holding result values for the data of one type
-
-    type : str
-        a string characterizung the data type (i.e. data_dark, data_white or data)
+    aggregates : dict <data_type : Aggregate>
+        dictionary with instances holding result values keyed by data type
 
     bad_indexes : dictionary
         a dictionary structure that the bad indexes will be written to
@@ -151,6 +163,7 @@ def add_bad_indexes_per_file(aggregate, type, bad_indexes, file_list, offset_lis
     -------
     None
     """
+
     list = []
     dict = {}
     offset = 0
@@ -158,16 +171,17 @@ def add_bad_indexes_per_file(aggregate, type, bad_indexes, file_list, offset_lis
     current_file = file_list[index]
     current_offset = offset_list[index]
 
-    for key in aggregate['bad_indexes'].keys():
-        if key == current_offset:
-            dict[current_file] = list
-            list = []
-            offset = current_offset
-            index += 1
-            current_file = file_list[index]
-            current_offset = offset_list[index]
-        list.append(key - offset)
-    dict[current_file] = list
+    for type in aggregates:
+        for key in aggregates[type]['bad_indexes'].keys():
+            if key == current_offset:
+                dict[current_file] = list
+                list = []
+                offset = current_offset
+                index += 1
+                current_file = file_list[index]
+                current_offset = offset_list[index]
+            list.append(key - offset)
+        dict[current_file] = list
     bad_indexes[type] = dict
 
 

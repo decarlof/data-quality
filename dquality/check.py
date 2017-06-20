@@ -57,6 +57,7 @@ import dquality.data as dqdata
 import dquality.hdf_dependency as dqdependency
 import dquality.accumulator as acc
 import dquality.monitor as dqdmonitor
+import dquality.monitor_polling as dqpolmonitor
 import dquality.pv as dqpv
 
 __author__ = "Barbara Frosik"
@@ -114,7 +115,7 @@ def pv(conf):
         print ('Some of the PVs listed in pvs.json do not exist or do not meet conditions')
 
 
-def monitor(conf, fname, num_files):
+def monitor(conf, folder, num_files):
     """
     Data quality monitor verifier.
     
@@ -136,8 +137,34 @@ def monitor(conf, fname, num_files):
 
     """
 
-    bad_indexes = dqdmonitor.verify(conf, fname, int(num_files))
+    bad_indexes = dqdmonitor.verify(conf, folder, int(num_files))
     return bad_indexes
+
+
+def monitor_polling(conf, folder, num_files):
+    """
+    Data quality monitor verifier.
+
+    Parameters
+    ----------
+    conf : str
+        configuration file name including path
+
+    folder : str
+        folder name to monitor
+
+    num_files : int
+        expected number of files. This script will exit after detecting and
+        processing given number of files.
+
+    Returns
+    -------
+    None
+
+    """
+    bad_indexes = dqpolmonitor.verify(conf, folder, int(num_files))
+    return bad_indexes
+
 
 def accumulator(conf, fname, dtype, num_files, report_by_file):
     """
@@ -218,4 +245,6 @@ def hdf_dependency(conf, fname):
         print ('All dependecies are satisfied')
     else:
         print ('Some dependecies are not satisfied, see log file')
+
+
 

@@ -58,7 +58,6 @@ from configobj import ConfigObj
 import pytz
 import datetime
 import dquality.common.constants as const
-import numpy as np
 
 
 __author__ = "Barbara Frosik"
@@ -178,7 +177,7 @@ def gt(value, limit):
     """
     return value > limit
 
-def get_config(conf_path):
+def get_config(config):
     """
     This function returns configuration dictionary. It checks the conf_path parameter wheter it is directory
     or a file. If a directory, it appends 'dqconfig_test.ini' as a file name. If the directory or file does not
@@ -187,7 +186,7 @@ def get_config(conf_path):
 
     Parameters
     ----------
-    conf_path : str
+    config : str
         name of the configuration file including path, or path
 
     Returns
@@ -195,12 +194,9 @@ def get_config(conf_path):
     conf : config Object
         a configuration object
     """
-    if os.path.isdir(conf_path):
-        config = os.path.join(conf_path, 'dqconfig.ini')
-    elif os.path.isfile(conf_path):
-        config = conf_path
-    else:
-        print ('configuration file ' + conf_path + ' not found')
+    if os.path.isdir(config):
+        config = os.path.join(config, 'dqconfig.ini')
+    if not os.path.isfile(config):
         return None
 
     return ConfigObj(config)
@@ -231,7 +227,7 @@ def get_logger(name, conf):
         # try absolute path
         lfile = conf['log_file']
     except KeyError:
-        print('config error: log file is not configured, logging to default.log')
+        print('config warning: log file is not configured, logging to default.log')
         lfile = 'default.log'
     except:
         print('config error: log file directory does not exist')
@@ -265,7 +261,7 @@ def get_logger(name, conf):
     return logger
 
 
-def get_file(conf, config_name, logger):
+def get_file(conf, config_name, logger, log_error=True):
     """
     This function returns a file object. It reads the file from a configuration file.
     If the file is not configured or does not exist a message is logged into a log file,
@@ -294,9 +290,10 @@ def get_file(conf, config_name, logger):
                 file + ' does not exist')
             return None
     except KeyError:
-        logger.error(
-            'configuration error: ' +
-            config_name + ' is not configured')
+        if log_error:
+            logger.error(
+                'configuration error: ' +
+                config_name + ' is not configured')
         return None
     return file
 
@@ -345,7 +342,6 @@ def get_data_ge(logger, file):
     """
     fp = open(file, 'rb')
     offset = 8192
-    size = 2048
 
     fp.seek(18)
     size, nframes = st.unpack('<ih',fp.read(6))
@@ -408,8 +404,10 @@ def key_list(dict):
 
 def get_quality_checks(dict):
     """
+    This function translates the strings into defined numerical values.
+
     This function takes a dictionary with all elements as strings, that are defined as constants in the
-    dquality/common.constants.py file. This function translates the strings into the actual numerical values.
+    dquality/common.constants.py file and replaces the strings with defined numerical values.
 
     Parameters
     ----------
@@ -419,14 +417,40 @@ def get_quality_checks(dict):
     Returns
     -------
     quality_checks : dict
-        A new dictionary with all elements replaced by the actual value the strings represented
+        A new dictionary with all elements replaced by the numerical values the strings represented
     """
+
     quality_checks = {}
-    for key in dict.keys():
-        value = dict[key]
+    for type in dict:
         list = []
-        for item in value:
-            list.append(const.globals(item))
-        quality_checks[const.globals(key)] = list
+        for qc in dict[type]:
+            list.append(const.get_id(qc))
+        quality_checks[type] = list
 
     return quality_checks
+
+
+def get_feedback_pvs(quality_checks):
+    """
+    This function translates numerical values into strings.
+
+    This function takes a dictionary with numerical velues, representing the quality checks that apply to the data type
+    (key). The numerical values are translated here to the string representations in a new dictionary.
+
+    Parameters
+    ----------
+    quality_checks : dictionary
+        a dictionary with numerical elements
+
+    Returns
+    -------
+    feedback_pvs : dict
+        A new dictionary with all elements replaced by the actual value the strings represented
+    """
+    feedback_pvs = []
+    for type in quality_checks:
+        qcs = quality_checks[type]
+        for qc in qcs:
+            qc_str = type + '_' + const.to_string(qc)
+            feedback_pvs.append(qc_str)
+    return feedback_pvs
